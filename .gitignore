@@ -1,0 +1,5 @@
+patches/*
+token.json
+builds/*
+redist/*
+hytale.exe
