@@ -1,4 +1,4 @@
-module hytale
+module hytLauncher
 
 go 1.25.3
 

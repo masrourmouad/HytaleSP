@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -20,7 +21,8 @@ import (
 const OAUTH_URL = "https://oauth.accounts.hytale.com/oauth2/auth";
 const TOKEN_URL = "https://oauth.accounts.hytale.com/oauth2/token";
 const REDIRECT_URI = "https://accounts.hytale.com/consent/client";
-const TOKEN_JSON = "token.json";
+
+var TOKEN_JSON = filepath.Join(LAUNCHER_FOLDER, "token.json");
 
 
 func openUrl(url string) {
@@ -190,14 +192,14 @@ func loadTokens() accessTokens {
 	jTokens, _ := os.ReadFile(TOKEN_JSON);
 	tokens  := accessTokens{};
 
-	reader := strings.NewReader(string(jTokens));
-	json.NewDecoder(reader).Decode(&tokens);
-
+	json.Unmarshal(jTokens, &tokens);
 	return tokens;
 }
 
 func saveTokens(tokens accessTokens) {
 	jTokens, _ := json.Marshal(tokens);
+
+	os.MkdirAll(filepath.Dir(TOKEN_JSON), 0666);
 	os.WriteFile(TOKEN_JSON, []byte(jTokens), 0666);
 }
 

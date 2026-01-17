@@ -17,6 +17,7 @@ var HOME_FOLDER, _ = os.UserHomeDir();
 var MAIN_FOLDER = filepath.Join(HOME_FOLDER, "hytLauncher");
 var GAME_FOLDER = filepath.Join(MAIN_FOLDER, "game", "versions");
 var USERDATA_FOLDER = filepath.Join(MAIN_FOLDER, "userdata");
+var LAUNCHER_FOLDER = filepath.Join(MAIN_FOLDER, "launcher");
 var JRE_FOLDER = filepath.Join(MAIN_FOLDER, "jre");
 
 func urlToPath(targetUrl string) string {
@@ -28,7 +29,7 @@ func urlToPath(targetUrl string) string {
 func download(targetUrl string, saveFilename string, progress func(done int64, total int64)) any {
 	fmt.Printf("Downloading %s\n", targetUrl);
 
-	os.MkdirAll(filepath.Dir(saveFilename), 0666);
+	os.MkdirAll(filepath.Dir(saveFilename), 0775);
 	resp, err := http.Get(targetUrl);
 	if err != nil {
 		return nil;
@@ -91,52 +92,53 @@ func downloadLatestVersion(atokens accessTokens, architecture string, operatingS
 func installJre(progress func(done int64, total int64)) any {
 	jres, ok := getJres("release").(versionFeed);
 	if ok {
-		if runtime.GOOS == "windows" && runtime.GOARCH == "amd64" {
-			downloadUrl := jres.DownloadUrls.Windows.Amd64.URL;
-			save := getJreDownloadPath(runtime.GOOS, runtime.GOARCH, downloadUrl);
-			unpack := getJrePath(runtime.GOOS, runtime.GOARCH);
+		downloadUrl := jres.DownloadUrls.Windows.Amd64.URL;
+		save := getJreDownloadPath(runtime.GOOS, runtime.GOARCH, downloadUrl);
+		unpack := getJrePath(runtime.GOOS, runtime.GOARCH);
 
-			_, ok := os.Stat(unpack);
+		_, err := os.Stat(unpack);
 
-			if ok != nil {
-				_, ok := download(downloadUrl, save, progress).(string);
-				if ok {
-					os.MkdirAll(unpack, 0666);
+		if err != nil {
+			_, ok := download(downloadUrl, save, progress).(string);
+			if ok {
+				os.MkdirAll(unpack, 0775);
 
-					unzip(save, unpack);
-					os.Remove(save);
-					os.RemoveAll(filepath.Dir(save));
-					return unpack;
-				}
+				unzip(save, unpack);
+				os.Remove(save);
+				os.RemoveAll(filepath.Dir(save));
+				return unpack;
 			}
-
-		} else {
-			fmt.Println("There is no version of Hytale for your operating system :C");
 		}
+
 	}
 
 	return nil;
+}
+
+func isGameVersionInstalled(version int, channel string) bool {
+	gameDir := getVersionInstallPath(version, channel);
+	_, err := os.Stat(gameDir);
+	if err != nil {
+		return false;
+	}
+	return true;
 }
 
 func installGame(version int, channel string, progress func(done int64, total int64)) any {
 	save := getVersionDownloadPath(0, version, channel);
 	unpack := getVersionInstallPath(version, channel);
 
-	if runtime.GOOS == "windows" && runtime.GOARCH == "amd64" {
-		_, ok := os.Stat(unpack);
+	if !isGameVersionInstalled(version, channel) {
+		downloadUrl := guessPatchUrlNoAuth(runtime.GOARCH, runtime.GOOS, channel, 0, version);
+		pwr := download(downloadUrl, save, progress);
+		os.MkdirAll(unpack, 0775);
 
-		if ok != nil {
-			downloadUrl := guessPatchUrlNoAuth(runtime.GOARCH, runtime.GOOS, channel, 0, version);
-			pwr := download(downloadUrl, save, progress);
-			os.MkdirAll(unpack, 0666);
+		if _, ok := pwr.(string); ok {
+			applyPatch(unpack, unpack, save);
 
-			if _, ok := pwr.(string); ok {
-				applyPatch(unpack, unpack, save);
-
-				os.Remove(save);
-				os.RemoveAll(filepath.Dir(save));
-				return unpack;
-			}
+			os.Remove(save);
+			os.RemoveAll(filepath.Dir(save));
+			return unpack;
 		}
 	}
 	return nil;

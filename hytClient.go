@@ -117,24 +117,42 @@ func checkVerExist(version int, architecture string, operatingSystem string, cha
 }
 
 
-func findLatestVersionNoAuth(architecture string, operatingSystem string, channel string) int {
+func findLatestVersionNoAuth(current int, architecture string, operatingSystem string, channel string) int {
 
-	lastVersion := 1;
-	curVersion := 1;
+	// obtaining the latest version from hytale CDN (as well as its 'pretty' name)
+	// requires authentication to hytale servers,
+	// however downloading versions does not,
+	// this is an optimized search alogirithm to find the latest version
+	//
+	// it makes a few assumptions; mainly-
+	// - there are never gaps in version numbers
+	// - the url scheme of version downloads is .. os/arch/channel/startver/destver.pwr
+	// if hytale ever changes how they handle this, then everything will break.
 
-	for checkVerExist(curVersion, architecture, operatingSystem, channel) {
-		lastVersion = curVersion;
-		curVersion *= 2;
-	}
 
-	for lastVersion+1 < curVersion {
-		middle := (curVersion + lastVersion) /2;
-		if checkVerExist(middle, architecture, operatingSystem,channel) {
-			lastVersion = middle;
-		} else {
-			curVersion = middle;
+	lastVersion := current;
+	curVersion := current;
+
+	// check if has been updates since this; no point if no new versions are added
+	if checkVerExist(current+1, architecture, operatingSystem, channel) {
+
+		// multiply version number by 2 until a version is not found ..
+		for checkVerExist(curVersion, architecture, operatingSystem, channel) {
+			lastVersion = curVersion;
+			curVersion *= 2;
+		}
+
+		// binary search from last valid, to largest invalid;
+		for lastVersion+1 < curVersion {
+			middle := (curVersion + lastVersion) /2;
+			if checkVerExist(middle, architecture, operatingSystem,channel) {
+				lastVersion = middle;
+			} else {
+				curVersion = middle;
+			}
 		}
 	}
+
 
 	return lastVersion;
 }
