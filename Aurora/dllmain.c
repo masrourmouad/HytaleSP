@@ -53,13 +53,11 @@ void allowOfflineInOnline(uint8_t* src) {
     int _ = 0;
     // 48 8D ?? ?? ?? ?? ?? ?? ?? ?? 80 ?? ?? 40 00 0F
     if (src[0] == 0x48 && src[1] == 0x8D && src[10] == 0x80 && src[13] == 0x40 && src[14] == 0x00 && src[15] == 0x0F) {
-        printf("Found debug check: %p\n", src);
 
         MEMORY_BASIC_INFORMATION mbi = { 0 };
         VirtualQuery(src, &mbi, sizeof(MEMORY_BASIC_INFORMATION));
         if (!VirtualProtect(mbi.BaseAddress, mbi.RegionSize, PAGE_READWRITE, &mbi.Protect)) return;
 
-        printf("Nopping: %p\n", &src[15]);
         memset(&src[15], 0x90, 0x6);
 
         if (!VirtualProtect(mbi.BaseAddress, mbi.RegionSize, mbi.Protect, &_)) return;
@@ -72,10 +70,6 @@ void changeServers() {
     MODULEINFO info;
     GetModuleInformation(GetCurrentProcess(), GetModuleHandleA(NULL), &info, sizeof(info));
     
-    printf("-------%p\n", info.EntryPoint);
-    printf("-------%p\n", info.lpBaseOfDll);
-    printf("-------%x\n", info.SizeOfImage);
-
     uint8_t* memory = (uint8_t*)info.lpBaseOfDll;
 
     for (uintptr_t i = 0; i < info.SizeOfImage; i++) {

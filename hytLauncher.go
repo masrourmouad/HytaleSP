@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"github.com/c4milo/unpackit"
 )
 
 
@@ -114,7 +115,17 @@ func installJre(progress func(done int64, total int64)) any {
 			if ok {
 				os.MkdirAll(unpack, 0775);
 
-				unzip(save, unpack);
+				f, err := os.Open(save);
+				if err != nil {
+					panic("failed to open jre download");
+				}
+
+				err = unpackit.Unpack(f, unpack);
+
+				if(err != nil) {
+					panic("failed to unpack jre");
+				}
+
 				os.Remove(save);
 				os.RemoveAll(filepath.Dir(save));
 				return unpack;
@@ -256,7 +267,6 @@ func launchGame(version int, channel string, username string, uuid string) {
 		// write fakeonline dll
 		if runtime.GOOS == "windows" {
 
-
 			dllName := filepath.Join(filepath.Dir(clientBinary), "Secur32.dll");
 			data, err := embeddedFiles.ReadFile("Aurora/Build/Aurora.dll");
 			if err != nil {
@@ -266,7 +276,7 @@ func launchGame(version int, channel string, username string, uuid string) {
 			defer os.Remove(dllName);
 
 		} else {
-			panic("fakeonline not supported on your platform.");
+			fmt.Printf("Your OS does not support fakeonline.\n");
 		}
 
 
@@ -291,6 +301,7 @@ func launchGame(version int, channel string, username string, uuid string) {
 		fmt.Printf("Running: %s %s\n", clientBinary, strings.Join(e.Args, " "))
 
 		e.Start();
+		defer e.Process.Kill();
 		e.Process.Wait();
 
 	} else { // start in offline mode
@@ -316,6 +327,7 @@ func launchGame(version int, channel string, username string, uuid string) {
 		fmt.Printf("Running: %s %s\n", clientBinary, strings.Join(e.Args, " "))
 
 		e.Start();
+		defer e.Process.Kill();
 		e.Process.Wait();
 	}
 }
