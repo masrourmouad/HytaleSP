@@ -13,8 +13,8 @@
 #include <assert.h>
 #elif _WIN32
 #define WIN32_MEAN_AND_LEAN 1
-#include <Windows.h>
-#include <Psapi.h>
+#include <windows.h>
+#include <psapi.h>
 #endif
 
 int change_prot(uintptr_t addr, int newProt) {
@@ -111,8 +111,8 @@ modinfo get_base() {
 	};
 #elif _WIN32
 	MODULEINFO info;
-	GetModuleInformation(GetCurrentProcess(), GetModuleHandleA(NULL), &info, sizeof(info));
-
+	K32GetModuleInformation(GetCurrentProcess(), GetModuleHandleA(NULL), &info, sizeof(info));
+	
 	return (modinfo) {
 		.start = info.lpBaseOfDll,
 		.sz = info.SizeOfImage
