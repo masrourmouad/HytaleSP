@@ -26,9 +26,8 @@ that replaces account-data.hytale.com with a custom server ..
 # Building
 
 on windows, you first have to build the "Aurora.dll" using MSVC, and then you can use ``go build .``
-alternatively, you can also use ``build-windows.bat`` which will build it as SUBSYSTEM:WINDOWS ..
-and generate the application manifest and version information;
+you can run 'build-windows.bat' within the VS2026 developer command prompt to do this;
 
-on linux, you need GCC, you can build "Aurora.so" using its makefile;
-then use ``go build .`` you can also try out 'build-linux.sh'
+on linux, you need ``build-essential`` and then you can build "Aurora.so" using its Makefile;
+after that you can use ``go build .`` you can also try out 'build-linux.sh'
 
