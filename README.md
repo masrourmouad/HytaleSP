@@ -3,7 +3,8 @@ An alternative launcher for "Hytale" with a fairly streightforward "native" UI
  
  - Multiple version management
  - Run offline without needing a hytale account.
- - Universal "fake online" or  "online fix" for every version;
+ - Universal "fake online" or "online fix" for all versions;
+ - Access all "Supporter" and "Cursebreaker" cosmetic items.
  
 Currently for: Windows and Linux
 
