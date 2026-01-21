@@ -1,4 +1,4 @@
-An alternative launcher for "Hytale" 
+An alternative launcher for "Hytale" with a fairly streightforward "native" UI
  features:
  
  - Multiple version management
@@ -8,6 +8,8 @@ An alternative launcher for "Hytale"
 Currently for: Windows and Linux
 
 (i need access to an ARM mac to make a mac os version) 
+
+
 
 ## Project layout
 
@@ -45,5 +47,8 @@ other names i considered using :
 
 in all seriousness i kind of would want something a bit original xS
 also this is not nessecarily planned to be a purely 'offline mode' launcher; 
+
 i also want to add "premium" support as well-
 mm the code for authentication flow is actually already here ..
+
+i wont remove that option though for those who need it~ 
