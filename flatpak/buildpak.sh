@@ -10,4 +10,4 @@ else
 fi
 
 $FPBUILD --force-clean build --repo=repo hytaleSP.yaml --user
-flatpak build-bundle repo hytale.flatpak trans.hytaleSP.hytaleSP
+flatpak build-bundle repo HytaleSP.flatpak trans.hytaleSP.hytaleSP
