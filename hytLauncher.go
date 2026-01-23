@@ -275,7 +275,7 @@ func findClientBinary(version int, channel string) string {
 		case "windows":
 			return filepath.Join(clientFolder, "HytaleClient.exe");
 		case "darwin":
-			fallthrough;
+			return filepath.Join(clientFolder, "Hytale.app", "Contents", "MacOS", "HytaleCleint");
 		case "linux":
 			return filepath.Join(clientFolder, "HytaleClient");
 		default:
@@ -352,6 +352,8 @@ func launchGame(version int, channel string, username string, uuid string) error
 
 		if runtime.GOOS == "linux" {
 			os.Setenv("LD_PRELOAD", dllName);
+		} else if runtime.GOOS == "darwin" {
+			os.Setenv("DYLD_INSERT_LIBRARIES ", dllName);
 		}
 
 		fmt.Printf("Running: %s\n", strings.Join(e.Args, " "))
@@ -364,6 +366,8 @@ func launchGame(version int, channel string, username string, uuid string) error
 
 		if runtime.GOOS == "linux" {
 			os.Unsetenv("LD_PRELOAD");
+		} else if runtime.GOOS == "darwin" {
+			os.Unsetenv("DYLD_INSERT_LIBRARIES");
 		}
 
 		defer e.Process.Kill();
@@ -379,7 +383,6 @@ func launchGame(version int, channel string, username string, uuid string) error
 		}
 
 		// get currently selected profile
-
 		profileList := *wCommune.Profiles;
 		profile := profileList[wCommune.SelectedProfile];
 

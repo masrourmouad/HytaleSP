@@ -460,15 +460,7 @@ func loginBox() base.Widget {
 						Text: "Login (OAuth 2.0)",
 						Disabled: loginDisabled,
 						OnClick: func() {
-							atokens, err := getAuthTokens(nil);
-							if err != nil {
-								showErrorDialog(fmt.Sprintf("Failed to login: %s", err), "Login error");
-								return;
-							}
-
-							wCommune.AuthTokens = &atokens;
-							writeSettings();
-							updateWindow();
+							go doAuthentication();
 						},
 					},
 					&goey.Button{
@@ -476,6 +468,7 @@ func loginBox() base.Widget {
 						Disabled: logoutDisabled,
 						OnClick: func() {
 							wCommune.AuthTokens = nil;
+							wCommune.Profiles = nil;
 							writeSettings();
 							updateWindow();
 						},
