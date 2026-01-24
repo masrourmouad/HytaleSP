@@ -152,7 +152,7 @@ func doOauth() (code string, verifier string, err error) {
 }
 
 
-func verifyToken(verifier string, code string) accessTokens {
+func verifyToken(verifier string, code string) (accessTokens, error) {
 
 	authStr := "Basic " + base64.URLEncoding.EncodeToString([]byte("hytale-launcher:"));
 
@@ -162,16 +162,28 @@ func verifyToken(verifier string, code string) accessTokens {
 	data.Add("grant_type", "authorization_code");
 	data.Add("redirect_uri", REDIRECT_URI);
 
-	req, _ := http.NewRequest("POST", TOKEN_URL, strings.NewReader(data.Encode()));
+	// create new request
+	req, err := http.NewRequest("POST", TOKEN_URL, strings.NewReader(data.Encode()));
+	if err != nil {
+		return accessTokens{}, err;
+	}
+
 	req.Header.Add("Authorization", authStr);
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded");
 
-	resp, _ := http.DefaultClient.Do(req);
+	// send response
+	resp, err := http.DefaultClient.Do(req);
+	if err != nil {
+		return accessTokens{}, err;
+	}
+	if resp.StatusCode != 200 {
+		return accessTokens{}, fmt.Errorf("%s got non-200 status: %d", TOKEN_URL, resp.StatusCode);
+	}
 
 	tokens := accessTokens{};
 	json.NewDecoder(resp.Body).Decode(&tokens);
 
-	return tokens;
+	return tokens, nil;
 
 }
 
@@ -187,12 +199,11 @@ func refreshToken(refreshToken string) (aToken accessTokens, err error){
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded");
 
 	resp, err := http.DefaultClient.Do(req);
-
 	if err != nil {
 		return accessTokens{}, err;
 	}
 	if resp.StatusCode != 200 {
-		return accessTokens{}, fmt.Errorf("Getting auth token gave status code %d", resp.StatusCode);
+		return accessTokens{}, fmt.Errorf("%s got non-200 status: %d", TOKEN_URL, resp.StatusCode);
 	}
 
 	newTokens := accessTokens{};
@@ -218,8 +229,11 @@ func getAuthTokens(previousTokens any) (atoken accessTokens, err error) {
 			return accessTokens{}, err;
 		}
 
-		aToken := verifyToken(verifier, code);
-		return aToken, nil;
+		aToken, err := verifyToken(verifier, code);
+		if err != nil {
+			return accessTokens{}, err;
+		}
+		return aToken, err;
 	}
 }
 

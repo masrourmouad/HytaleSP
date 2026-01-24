@@ -57,13 +57,13 @@ func getNewSession(atokens accessTokens, uuid string) (sessionNew, error) {
 		return sessionNew{}, err;
 	}
 
-
-	if resp.StatusCode == 200 {
-		json.NewDecoder(resp.Body).Decode(&n);
-		return n, nil;
+	if resp.StatusCode != 200 {
+		return sessionNew{}, fmt.Errorf("%s got non-200 status: %d", fullUrl, resp.StatusCode);
 	}
 
-	return sessionNew{}, fmt.Errorf("got non-200 status");
+	json.NewDecoder(resp.Body).Decode(&n);
+	return n, nil;
+
 
 }
 
@@ -74,6 +74,10 @@ func getJres(channel string) (versionFeed, error) {
 	resp, err := http.Get(fullUrl);
 	if err != nil{
 		return versionFeed{}, err;;
+	}
+
+	if resp.StatusCode != 200 {
+		return versionFeed{}, fmt.Errorf("%s got non-200 status: %d", fullUrl, resp.StatusCode);
 	}
 
 	feed := versionFeed{};
@@ -90,7 +94,9 @@ func getLaunchers(channel string) (versionFeed, error) {
 	if err != nil{
 		return versionFeed{}, err;;
 	}
-
+	if resp.StatusCode != 200 {
+		return versionFeed{}, fmt.Errorf("%s got non-200 status: %d", fullUrl, resp.StatusCode);
+	}
 
 	feed := versionFeed{};
 	json.NewDecoder(resp.Body).Decode(&feed);
@@ -121,6 +127,11 @@ func getLauncherData(atokens accessTokens, architecture string, operatingSystem 
 		return launcherData{}, err;
 	}
 
+	if resp.StatusCode != 200 {
+		return launcherData{}, fmt.Errorf("%s got non-200 status: %d", fullUrl, resp.StatusCode);
+	}
+
+
 	ldata := launcherData{};
 	json.NewDecoder(resp.Body).Decode(&ldata);
 
@@ -140,7 +151,9 @@ func getVersionManifest(atokens accessTokens, architecture string, operatingSyst
 	if err != nil {
 		return versionManifest{}, err;
 	}
-
+	if resp.StatusCode != 200 {
+		return versionManifest{}, fmt.Errorf("%s got non-200 status: %d", fullUrl, resp.StatusCode);
+	}
 
 	mdata := versionManifest{};
 	json.NewDecoder(resp.Body).Decode(&mdata);
@@ -185,6 +198,10 @@ func findLatestVersionNoAuth(current int, architecture string, operatingSystem s
 	// - the url scheme of version downloads is .. os/arch/channel/startver/destver.pwr
 	// if hytale ever changes how they handle this, then everything will break.
 
+
+	if current <= 0 {
+		current = 1;
+	}
 
 	lastVersion := current;
 	curVersion := current;

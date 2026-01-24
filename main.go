@@ -109,6 +109,9 @@ func authenticatedCheckForUpdatesAndGetProfileList() {
 	if wCommune.AuthTokens == nil {
 		return;
 	}
+	if(wCommune.Mode != "authenticated") {
+		return;
+	}
 
 	lData, err := getLauncherData(*wCommune.AuthTokens, runtime.GOARCH, runtime.GOOS);
 
@@ -129,11 +132,11 @@ func authenticatedCheckForUpdatesAndGetProfileList() {
 	lastPreReleaseVersion := wCommune.LatestVersions["pre-release"];
 	latestPreReleaseVersion := lData.Patchlines.PreRelease.Newest;
 
-	if lastReleaseVersion > latestReleaseVersion {
+	if latestReleaseVersion > lastReleaseVersion {
 		fmt.Printf("found new release: %d\n", lastReleaseVersion)
 		wCommune.LatestVersions["release"] = latestReleaseVersion;
 	}
-	if lastPreReleaseVersion > latestPreReleaseVersion {
+	if latestPreReleaseVersion > lastPreReleaseVersion {
 		fmt.Printf("found new release: %d\n", lastPreReleaseVersion)
 		wCommune.LatestVersions["pre-release"] = latestPreReleaseVersion;
 	}
@@ -150,12 +153,18 @@ func authenticatedCheckForUpdatesAndGetProfileList() {
 }
 
 func reAuthenticate() {
-	if wCommune.AuthTokens != nil {
+	if wCommune.AuthTokens != nil && wCommune.Mode == "authenticated" {
 		aTokens, err:= getAuthTokens(*wCommune.AuthTokens);
 
 		if err != nil {
-			fmt.Printf("Failed to get auth token: %s\n",err);
-			return;
+			showErrorDialog(fmt.Sprintf("Failed to authenticate: %s", err), "Auth failed.");
+			wCommune.AuthTokens = nil;
+			wCommune.Mode = "fakeonline";
+			loop.Do(func() error {
+				updateWindow();
+				writeSettings();
+				return nil;
+			});
 		}
 
 		wCommune.AuthTokens = &aTokens;

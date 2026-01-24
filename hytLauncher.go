@@ -34,25 +34,28 @@ func download(targetUrl string, saveFilename string, progress func(done int64, t
 	if err != nil {
 		return err;
 	}
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("%s got non-200 status: %d", targetUrl, resp.StatusCode);
+	}
 
-	if resp.StatusCode == 200 {
-		f, err := os.Create(saveFilename);
+	f, err := os.Create(saveFilename);
+	if err != nil {
+		return err;
+	}
+	defer f.Close();
+
+	total := resp.ContentLength;
+	done := int64(0);
+	buffer := make([]byte, 0x8000);
+
+	for done < total {
+		rd, err := resp.Body.Read(buffer);
 		if err != nil {
 			return err;
 		}
-
-		defer f.Close();
-
-		total := resp.ContentLength;
-		done := int64(0);
-		buffer := make([]byte, 0x8000);
-
-		for done < total {
-			rd, _ := resp.Body.Read(buffer);
-			done += int64(rd);
-			f.Write(buffer[:rd]);
-			progress(done, total);
-		}
+		done += int64(rd);
+		f.Write(buffer[:rd]);
+		progress(done, total);
 	}
 
 	return nil;
