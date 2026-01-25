@@ -12,6 +12,8 @@ finish-args:
 - --device=dri
 - --share=ipc
 - --persist=hytLauncher
+- --filesystem=xdg-config/gtk-3.0
+- --filesystem=xdg-run/pipewire-0
 
 modules:
 - name: HytaleSP
