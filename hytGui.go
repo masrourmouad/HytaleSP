@@ -12,10 +12,11 @@ import (
 	"runtime"
 	"strconv"
 
-	"bitbucket.org/rj/goey"
-	"bitbucket.org/rj/goey/base"
-	"bitbucket.org/rj/goey/loop"
-	"bitbucket.org/rj/goey/windows"
+	"git.silica.codes/Li/goey"
+	"git.silica.codes/Li/goey/base"
+	"git.silica.codes/Li/goey/loop"
+	"git.silica.codes/Li/goey/windows"
+
 	"github.com/sqweek/dialog"
 )
 
@@ -24,33 +25,54 @@ type launcherCommune struct {
 	Username string `json:"last_username"`
 	SelectedVersion int `json:"last_version"`
 	LatestVersions map[string]int `json:"last_version_scan_result"`
-	GameFolder string `json:"install_directory"`
 	Mode string `json:"mode"`
+
+	// authentication
 	AuthTokens *accessTokens `json:"token"`
 	Profiles *[]accountInfo `json:"profiles"`
 	SelectedProfile int `json:"selected_profile"`
+
+	// settings
+	GameFolder string `json:"install_directory"`
+	UserDataFolder string `json:"userdata_directory"`
+	JreFolder string `json:"jre_directory"`
+	UUID string `json:"uuid_override"`
 }
 
+
+const DEFAULT_USERNAME = "TransRights";
+const DEFAULT_PATCHLINE = "release";
 
 var (
 	wMainWin *windows.Window
 	wCommune = launcherCommune {
-		Patchline: "release",
-		Username: "TransRights",
+		Patchline: DEFAULT_PATCHLINE,
+		Username: DEFAULT_USERNAME,
 		LatestVersions: map[string]int{
 			"release": 5,
 			"pre-release": 12,
 		},
 		SelectedVersion: 4,
-		GameFolder: DefaultGameFolder(),
 		Mode: "fakeonline",
 		AuthTokens: nil,
 		Profiles: nil,
 		SelectedProfile: 0,
+
+		GameFolder: DefaultGameFolder(),
+		UserDataFolder: DefaultUserDataFolder(),
+		JreFolder: DefaultJreFolder(),
+		UUID: "",
 	};
 	wProgress = 0
 	wDisabled = false
+	wSelectedTab = 0
+
+	wAdvanced = false
+	w = false
 )
+
+
+
 
 func doAuthentication() {
 	aTokens, err := getAuthTokens(wCommune.AuthTokens);
@@ -260,7 +282,7 @@ func startGame() {
 		return;
 	};
 
-	err = launchGame(wCommune.SelectedVersion, wCommune.Patchline, wCommune.Username, usernameToUuid(wCommune.Username));
+	err = launchGame(wCommune.SelectedVersion, wCommune.Patchline, wCommune.Username, getUUID());
 
 	if err != nil {
 		showErrorDialog(fmt.Sprintf("Error running the game: %s", err), "Run game failed.");
@@ -356,45 +378,75 @@ func versionMenu() base.Widget {
 	};
 }
 
-func installLocation() base.Widget {
-	return &goey.VBox {
-			AlignMain: goey.SpaceBetween,
-			Children: []base.Widget {
-				&goey.Label{ Text: "Install Location:" },
-				&goey.HBox{
-					AlignCross: goey.CrossCenter,
-					Children: []base.Widget {
-						&goey.Expand{
-							Child: &goey.TextInput{
-								Placeholder: "Install Location",
-								Disabled: wDisabled,
-								Value: wCommune.GameFolder,
-								OnChange: func(v string) {
-									wCommune.GameFolder = v;
-									updateWindow();
-								},
-							},
-						},
-						&goey.Button{
-							Text: "Browse",
-							Disabled: wDisabled,
-							OnClick: func() {
-								dir, err := dialog.Directory().Title("Select install location").Browse();
-								if err != nil {
-									if err != dialog.ErrCancelled {
-										showErrorDialog(fmt.Sprintf("Failed: %s", err), "Error reading directory");
-									}
-								}
 
-								wCommune.GameFolder = dir;
+func labeledTextInput(label string, value *string, disabled bool) base.Widget {
+	if value == nil {
+		panic("failed to initalize browse button");
+	}
+
+	isDisabled := wDisabled || disabled;
+
+	return &goey.VBox{
+		AlignMain: goey.SpaceBetween,
+		Children: []base.Widget {
+			&goey.Label{ Text: label + ": " },
+			&goey.TextInput{
+				Placeholder: label,
+				Disabled: isDisabled,
+				Value: *value,
+				OnChange: func(v string) {
+					*value = v;
+					updateWindow();
+				},
+			},
+		},
+	};
+}
+
+func browseButton(label string, value *string) base.Widget {
+	if value == nil {
+		panic("failed to initalize browse button");
+	}
+
+	return &goey.VBox {
+		AlignMain: goey.SpaceBetween,
+		Children: []base.Widget {
+			&goey.Label{ Text: label +": " },
+			&goey.HBox{
+				AlignCross: goey.CrossCenter,
+				Children: []base.Widget {
+					&goey.Expand{
+						Child: &goey.TextInput{
+							Placeholder: label,
+							Disabled: wDisabled,
+							Value: *value,
+							OnChange: func(v string) {
+								*value = v;
 								updateWindow();
 							},
 						},
 					},
+					&goey.Button{
+						Text: "Browse",
+						Disabled: wDisabled,
+						OnClick: func() {
+							dir, err := dialog.Directory().Title("Select "+label).Browse();
+							if err != nil {
+								if err != dialog.ErrCancelled {
+									showErrorDialog(fmt.Sprintf("Failed: %s", err), "Error reading directory");
+								}
+							}
+
+							*value = dir;
+							updateWindow();
+						},
+					},
 				},
 			},
+		},
 	};
 }
+
 
 
 func modeSelector () base.Widget {
@@ -437,26 +489,9 @@ func modeSelector () base.Widget {
 	}
 }
 
-func usernameBox() base.Widget {
-	usernameDisabled := wDisabled || wCommune.Mode == "authenticated";
 
-	return &goey.VBox{
-		AlignMain: goey.SpaceBetween,
-		Children: []base.Widget{
-			&goey.Label{Text: "Username:"},
-			&goey.TextInput{
-					Value: wCommune.Username,
-					Placeholder: "Username",
-					Disabled: usernameDisabled,
-					OnChange: func(v string) {
-						wCommune.Username = v;
-					},
-			},
-		},
-	};
-}
 
-func authLoginBox() base.Widget {
+func drawAuthenticatedSettings() base.Widget {
 
 	if wCommune.Mode != "authenticated" {
 		return &goey.Empty{}
@@ -475,7 +510,7 @@ func authLoginBox() base.Widget {
 	return &goey.VBox {
 		AlignMain: goey.MainStart,
 		Children: []base.Widget {
-			&goey.HR{},
+			drawDivider("Authentication"),
 			&goey.HBox{
 				AlignCross: goey.CrossCenter,
 				AlignMain: goey.Homogeneous,
@@ -539,7 +574,9 @@ func drawStartGame() base.Widget{
 	return &goey.VBox {
 		AlignMain: goey.MainStart,
 		Children: []base.Widget {
-			usernameBox(),
+			labeledTextInput("Username", &wCommune.Username, wCommune.Mode == "authenticated"),
+			modeSelector(),
+			drawDivider("Version"),
 			patchLineMenu(),
 			versionMenu(),
 			createDownloadProgress(),
@@ -550,41 +587,58 @@ func drawStartGame() base.Widget{
 					go startGame();
 				},
 			},
+			drawAuthenticatedSettings(),
 		},
 	}
 }
+
+func drawDivider(label string) base.Widget {
+	return &goey.HBox{
+		AlignCross: goey.CrossCenter,
+		Children: []base.Widget{
+			&goey.Label{
+				Text: label,
+			},
+			&goey.Expand{
+				Child: &goey.HR{},
+			},
+		},
+	};
+}
+
+
 
 func drawSettings() base.Widget{
 	return &goey.VBox{
 		AlignMain: goey.MainStart,
 		Children: []base.Widget {
-			&goey.HR{},
-			installLocation(),
-			modeSelector(),
-			authLoginBox(),
+			drawDivider("Directories"),
+			browseButton("Game Location", &wCommune.GameFolder),
+			browseButton("JRE Location", &wCommune.JreFolder),
+			browseButton("Game UserData Location", &wCommune.UserDataFolder),
+			drawDivider("Advanced"),
+			labeledTextInput("★UUID Override", &wCommune.UUID, wCommune.Mode == "authenticated"),
 		},
 	};
 }
 
+
 func drawWidgets() base.Widget {
-	return &goey.VBox {
-				AlignMain: goey.MainStart,
-				Children: []base.Widget {
-					&goey.Padding{
-						Insets: goey.DefaultInsets(),
-						Child: &goey.Align{
-							HAlign: goey.AlignCenter,
-							Child: &goey.VBox {
-								AlignMain: goey.MainStart,
-								Children: []base.Widget {
-									drawStartGame(),
-									drawSettings(),
-								},
-							},
-						},
-					},
-				},
-			}
+	return &goey.Tabs {
+		Value: wSelectedTab,
+		OnChange: func( v int ) {wSelectedTab = v;},
+		Children: []goey.TabItem {
+			{
+				Caption: "Game",
+				Child: drawStartGame(),
+			},
+			{
+				Caption: "Settings",
+				Child: drawSettings(),
+			},
+		},
+	};
+
 }
 
 func createWindow() error {
@@ -594,7 +648,7 @@ func createWindow() error {
 		return err
 	}
 
-	win.SetScroll(false, false);
+	win.SetScroll(false, true);
 
 	win.SetOnClosing(func() bool {
 		writeSettings();
@@ -622,6 +676,7 @@ func updateWindow() error {
 	}
 
 	err := wMainWin.SetChild(drawWidgets());
+
 	if err != nil {
 		showErrorDialog(fmt.Sprintf("error updating window: %s", err), "error updating window");
 		return err;
@@ -643,10 +698,11 @@ func main() {
 
 	os.MkdirAll(MainFolder(), 0775);
 	os.MkdirAll(LauncherFolder(), 0775);
-	os.MkdirAll(UserDataFolder(), 0775);
-	os.MkdirAll(JreFolder(), 0775);
 	os.MkdirAll(ServerDataFolder(), 0775);
 	readSettings();
+
+	os.MkdirAll(UserDataFolder(), 0775);
+	os.MkdirAll(JreFolder(), 0775);
 	os.MkdirAll(GameFolder(), 0775);
 
 	go reAuthenticate();

@@ -14,7 +14,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
+
 	"github.com/google/uuid"
 )
 
@@ -137,7 +140,7 @@ func genAccountInfo() accountInfo {
 	readSkinData();
 	return accountInfo{
 		Username: wCommune.Username,
-		UUID: usernameToUuid(wCommune.Username),
+		UUID: getUUID(),
 		Entitlements: ENTITLEMENTS,
 		CreatedAt: time.Now(),
 		NextNameChangeAt: time.Now(),
@@ -339,19 +342,22 @@ func generateSessionJwt(scope string) string {
 		Iss: SERVER_PROTOCOL + SERVER_URI,
 		Jti: uuid.NewString(),
 		Scope: scope,
-		Sub: usernameToUuid(wCommune.Username),
+		Sub: getUUID(),
 	};
 
 	return make_jwt(sesTok);
 }
 
+func getUUID() string{
+	r, err := regexp.MatchString("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", strings.ToLower(wCommune.UUID));
+	if err == nil || r == false{
+		m := md5.New();
+		m.Write([]byte(wCommune.Username));
+		h := hex.EncodeToString(m.Sum(nil));
 
-func usernameToUuid(username string) string {
-	m := md5.New();
-	m.Write([]byte(username));
-	h := hex.EncodeToString(m.Sum(nil));
-
-	return h[:8]+"-"+h[8:12]+"-"+h[12:16]+"-"+h[16:20]+"-"+h[20:32];
+		return h[:8]+"-"+h[8:12]+"-"+h[12:16]+"-"+h[16:20]+"-"+h[20:32];
+	}
+	return wCommune.UUID;
 }
 
 func generateIdentityJwt(scope string) string {
@@ -362,7 +368,7 @@ func generateIdentityJwt(scope string) string {
 		Iss: SERVER_PROTOCOL + SERVER_URI,
 		Jti: uuid.NewString(),
 		Scope: scope,
-		Sub: usernameToUuid(wCommune.Username),
+		Sub: getUUID(),
 		Profile: profileInfo {
 			Username: wCommune.Username,
 			Entitlements: ENTITLEMENTS,
