@@ -206,10 +206,13 @@ func handleMyAccountLauncherData(w http.ResponseWriter, req *http.Request) {
 
 func handleSessionChild(w http.ResponseWriter, req *http.Request) {
 
+	sessionRequest := sessionChild{};
+	json.NewDecoder(req.Body).Decode(&sessionRequest);
+
 	session := sessionNew{
 		ExpiresAt: time.Now().Add(time.Hour*10),
-		IdentityToken: generateIdentityJwt("hytale:server"),
-		SessionToken: generateSessionJwt("hytale:server"),
+		IdentityToken: generateIdentityJwt(sessionRequest.Scopes),
+		SessionToken: generateSessionJwt(sessionRequest.Scopes),
 	}
 
 	w.Header().Add("Content-Type", "application/json");
@@ -332,22 +335,6 @@ func make_jwt(body any) string {
 	return jwt;
 }
 
-
-func generateSessionJwt(scope string) string {
-
-
-	sesTok := sessionToken {
-		Exp: int(time.Now().Add(time.Hour*10).Unix()),
-		Iat: int(time.Now().Unix()),
-		Iss: SERVER_PROTOCOL + SERVER_URI,
-		Jti: uuid.NewString(),
-		Scope: scope,
-		Sub: getUUID(),
-	};
-
-	return make_jwt(sesTok);
-}
-
 func getUUID() string{
 	r, err := regexp.MatchString("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", strings.ToLower(wCommune.UUID));
 	if err == nil || r == false{
@@ -360,14 +347,32 @@ func getUUID() string{
 	return wCommune.UUID;
 }
 
-func generateIdentityJwt(scope string) string {
+func generateSessionJwt(scope []string) string {
 
-	idTok := identityToken {
-		Exp: int(time.Now().Add(time.Hour*10).Unix()),
+
+	sesTok := sessionToken {
+		Exp: int(time.Now().Add(time.Hour*200).Unix()),
 		Iat: int(time.Now().Unix()),
 		Iss: SERVER_PROTOCOL + SERVER_URI,
 		Jti: uuid.NewString(),
-		Scope: scope,
+		Scope: strings.Join(scope, " "),
+		Sub: getUUID(),
+	};
+	fmt.Printf("[JWT] Generating new session JWT with scopes: %s\n", sesTok.Scope);
+
+	return make_jwt(sesTok);
+}
+
+
+
+func generateIdentityJwt(scope []string) string {
+
+	idTok := identityToken {
+		Exp: int(time.Now().Add(time.Hour*200).Unix()),
+		Iat: int(time.Now().Unix()),
+		Iss: SERVER_PROTOCOL + SERVER_URI,
+		Jti: uuid.NewString(),
+		Scope: strings.Join(scope, " "),
 		Sub: getUUID(),
 		Profile: profileInfo {
 			Username: wCommune.Username,
@@ -376,5 +381,6 @@ func generateIdentityJwt(scope string) string {
 		},
 	};
 
+	fmt.Printf("[JWT] Generating new identity JWT with scopes: %s\n", idTok.Scope);
 	return make_jwt(idTok);
 }
