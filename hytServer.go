@@ -88,8 +88,8 @@ func readCosmetics() string {
 
 	// get currently installed gane folder ...
 
-	patchline := wCommune.Patchline;
-	gotVersion := int(wCommune.SelectedVersion);
+	patchline := valToChannel(int(wCommune.Patchline));
+	gotVersion := int(wCommune.SelectedVersion+1);
 
 	assetsZip := filepath.Join(getVersionInstallPath(gotVersion, patchline), "Assets.zip" );
 

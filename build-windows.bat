@@ -13,4 +13,4 @@ REM setup application manifest
 go generate
 
 REM build with subsystem:windows
-go build -ldflags="-H windowsgui"
+go build -ldflags="-s -w -H=windowsgui -extldflags=-static"

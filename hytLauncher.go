@@ -360,7 +360,7 @@ func launchGame(version int, channel string, username string, uuid string) error
 		os.Remove(dllName);
 	}
 
-	if wCommune.Mode == "fakeonline" { // start with fake online mode
+	if wCommune.Mode == E_MODE_FAKEONLINE { // start with fake online mode
 
 		// setup fake online patch
 		go runServer();
@@ -431,7 +431,7 @@ func launchGame(version int, channel string, username string, uuid string) error
 
 		e.Process.Wait();
 
-	} else if wCommune.Mode == "authenticated" { // start authenticated
+	} else if wCommune.Mode == E_MODE_AUTHENTICATED { // start authenticated
 		if wCommune.AuthTokens == nil {
 			return errors.New("No auth token found.");
 		}

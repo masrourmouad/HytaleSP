@@ -12,16 +12,17 @@ import (
 	"runtime"
 	"strconv"
 
+	"github.com/AllenDang/cimgui-go/imgui"
 	"github.com/AllenDang/giu"
 	"github.com/sqweek/dialog"
 )
 
 type launcherCommune struct {
-	Patchline string `json:"last_patchline"`
+	Patchline int32 `json:"last_patchline"`
 	Username string `json:"last_username"`
 	SelectedVersion int32 `json:"last_version"`
 	LatestVersions map[string]int `json:"last_version_scan_result"`
-	Mode string `json:"mode"`
+	Mode int32 `json:"mode"`
 
 	// authentication
 	AuthTokens *accessTokens `json:"token"`
@@ -37,7 +38,15 @@ type launcherCommune struct {
 
 
 const DEFAULT_USERNAME = "TransRights";
-const DEFAULT_PATCHLINE = "release";
+const DEFAULT_PATCHLINE = E_PATCH_RELEASE;
+
+
+const E_MODE_OFFLINE = 0;
+const E_MODE_FAKEONLINE = 1;
+const E_MODE_AUTHENTICATED = 2;
+
+const E_PATCH_RELEASE = 0
+const E_PATCH_PRE_RELEASE = 1
 
 var (
 	wMainWin *giu.MasterWindow
@@ -49,7 +58,7 @@ var (
 			"pre-release": 12,
 		},
 		SelectedVersion: 4,
-		Mode: "fakeonline",
+		Mode: E_MODE_FAKEONLINE,
 		AuthTokens: nil,
 		Profiles: nil,
 		SelectedProfile: 0,
@@ -59,17 +68,18 @@ var (
 		JreFolder: DefaultJreFolder(),
 		UUID: "",
 	};
-	wProgress = 0
+	wProgress float32 = 0.0
 	wDisabled = false
 	wSelectedTab = 0
-	wSelectedMode int32 = 0
-	wSelectedPatchline int32 = 0
 
-	wAdvanced = false
-	w = false
+	wImGuiWindow *giu.WindowWidget = nil;
 )
 
 
+func getWindowWidth() float32 {
+	vec2 := imgui.ContentRegionAvail();
+	return vec2.X; //float32(w) - float32(padX*2);
+}
 
 
 func doAuthentication() {
@@ -78,7 +88,7 @@ func doAuthentication() {
 	if err != nil {
 		showErrorDialog(fmt.Sprintf("Failed to get auth tokens: %s", err), "Auth failed.");
 		wCommune.AuthTokens = nil;
-		wCommune.Mode = "fakeonline";
+		wCommune.Mode = E_MODE_FAKEONLINE;
 		writeSettings();
 		//loop.Do(updateWindow);
 	}
@@ -92,7 +102,7 @@ func doAuthentication() {
 
 
 func checkForUpdates() {
-	if wCommune.Mode != "authenticated" {
+	if wCommune.Mode != E_MODE_AUTHENTICATED {
 		lastRelease := wCommune.LatestVersions["release"]
 		lastPreRelease := wCommune.LatestVersions["pre-release"]
 
@@ -112,7 +122,6 @@ func checkForUpdates() {
 			wCommune.LatestVersions["pre-release"] = latestPreRelease;
 		}
 
-		//loop.Run(updateWindow);
 		writeSettings();
 	}
 }
@@ -121,7 +130,7 @@ func authenticatedCheckForUpdatesAndGetProfileList() {
 	if wCommune.AuthTokens == nil {
 		return;
 	}
-	if(wCommune.Mode != "authenticated") {
+	if(wCommune.Mode != E_MODE_AUTHENTICATED) {
 		return;
 	}
 
@@ -130,11 +139,7 @@ func authenticatedCheckForUpdatesAndGetProfileList() {
 	if err != nil {
 		showErrorDialog(fmt.Sprintf("Failed to get launcher data: %s", err), "Auth failed.");
 		wCommune.AuthTokens = nil;
-		wCommune.Mode = "fakeonline";
-		/*
-		go func() {
-			loop.Do(updateWindow);
-		}(); */
+		wCommune.Mode = E_MODE_FAKEONLINE;
 		writeSettings();
 	}
 
@@ -159,13 +164,13 @@ func authenticatedCheckForUpdatesAndGetProfileList() {
 }
 
 func reAuthenticate() {
-	if wCommune.AuthTokens != nil && wCommune.Mode == "authenticated" {
+	if wCommune.AuthTokens != nil && wCommune.Mode == E_MODE_AUTHENTICATED {
 		aTokens, err:= getAuthTokens(*wCommune.AuthTokens);
 
 		if err != nil {
 			showErrorDialog(fmt.Sprintf("Failed to authenticate: %s", err), "Auth failed.");
 			wCommune.AuthTokens = nil;
-			wCommune.Mode = "fakeonline";
+			wCommune.Mode = E_MODE_FAKEONLINE;
 			writeSettings();
 		}
 
@@ -219,8 +224,8 @@ func readSettings() {
 
 		fmt.Printf("Reading last settings: \n");
 		fmt.Printf("username: %s\n", wCommune.Username);
-		fmt.Printf("patchline: %s\n", wCommune.Patchline);
-		fmt.Printf("last used version: %d\n", wCommune.SelectedVersion);
+		fmt.Printf("patchline: %s\n", valToChannel(int(wCommune.Patchline)));
+		fmt.Printf("last used version: %d\n", wCommune.SelectedVersion+1);
 		fmt.Printf("newest known release: %d\n", wCommune.LatestVersions["release"])
 		fmt.Printf("newest known pre-release: %d\n", wCommune.LatestVersions["pre-release"])
 
@@ -230,9 +235,9 @@ func readSettings() {
 
 func valToChannel(vchl int) string {
 	switch vchl {
-		case 0:
+		case E_PATCH_RELEASE:
 			return "release";
-		case 1:
+		case E_PATCH_PRE_RELEASE:
 			return "pre-release";
 		default:
 			return "release";
@@ -242,11 +247,11 @@ func valToChannel(vchl int) string {
 func channelToVal(channel string) int {
 	switch channel {
 		case "release":
-			return 0;
+			return E_PATCH_RELEASE;
 		case "pre-release":
-			return 1;
+			return E_PATCH_PRE_RELEASE;
 		default:
-			return 0;
+			return DEFAULT_PATCHLINE;
 	}
 }
 
@@ -266,14 +271,14 @@ func startGame() {
 		return;
 	};
 
-	err = installGame(int(wCommune.SelectedVersion), wCommune.Patchline, updateProgress);
+	err = installGame(int(wCommune.SelectedVersion+1), valToChannel(int(wCommune.Patchline)), updateProgress);
 
 	if err != nil {
 		showErrorDialog(fmt.Sprintf("Error getting the game: %s", err), "Install game failed.");
 		return;
 	};
 
-	err = launchGame(int(wCommune.SelectedVersion), wCommune.Patchline, wCommune.Username, getUUID());
+	err = launchGame(int(wCommune.SelectedVersion+1), valToChannel(int(wCommune.Patchline)), wCommune.Username, getUUID());
 
 	if err != nil {
 		showErrorDialog(fmt.Sprintf("Error running the game: %s", err), "Run game failed.");
@@ -282,58 +287,57 @@ func startGame() {
 }
 
 func patchLineMenu() giu.Widget {
-
 	return giu.Layout{
 		giu.Label("Patchline: "),
-		giu.Combo("#patchline", wCommune.Patchline, []string{"release", "pre-release"}, &wSelectedPatchline).OnChange(func() {
-			wCommune.Patchline = valToChannel(int(wSelectedPatchline));
-			wCommune.SelectedVersion = int32(wCommune.LatestVersions[wCommune.Patchline]);
-		}),
+		giu.Row(
+			giu.Combo("##patchline", valToChannel(int(wCommune.Patchline)), []string{"release", "pre-release"}, &wCommune.Patchline).OnChange(func() {
+				wCommune.SelectedVersion = int32(wCommune.LatestVersions[valToChannel(int(wCommune.Patchline))]-1);
+			}).Size(getWindowWidth()),
+		),
 	}
 }
 
-
 func versionMenu() giu.Widget {
 	versions := []string {};
+	selectedChannel := valToChannel(int(wCommune.Patchline));
+	selectedVersion := int(wCommune.SelectedVersion+1);
 
-	latest := wCommune.LatestVersions[wCommune.Patchline];
+	latest := wCommune.LatestVersions[selectedChannel];
 
 	for i := range latest {
 		txt := "Version "+strconv.Itoa(i+1);
-		if isGameVersionInstalled(i+1, wCommune.Patchline) {
+		if isGameVersionInstalled(i+1, selectedChannel) {
 			txt += " - installed";
 		} else {
 			txt += " - not installed";
 		}
-
 		versions = append(versions, txt);
 	}
+	disabled := !isGameVersionInstalled(selectedVersion, selectedChannel) || wDisabled;
+;
 
-	gotVersion := int(wCommune.SelectedVersion);
-	selectedChannel := wCommune.Patchline;
+	bSize := getButtonSize("Delete")
+	padX, _ := giu.GetWindowPadding();
 
-	disabled := !isGameVersionInstalled(gotVersion, selectedChannel) || wDisabled;
 
 
 	return giu.Layout{
 		giu.Label("Version: "),
-
 		giu.Row(
-			giu.Combo("#version", versions[gotVersion-1], versions, &wCommune.SelectedVersion).Flags(giu.ComboFlagsNone),
+			giu.Combo("##version", versions[int(wCommune.SelectedVersion) % len(versions)], versions, &wCommune.SelectedVersion).Size(getWindowWidth() - (bSize + padX)),
 			giu.Button("Delete").Disabled(disabled).OnClick(func() {
 				wDisabled = true;
 
 				go func() {
-						installDir := getVersionInstallPath(gotVersion, wCommune.Patchline);
-						err := os.RemoveAll(installDir);
-						if err != nil {
-							showErrorDialog(fmt.Sprintf("failed to remove: %s", err), "failed to remove");
-						}
+					installDir := getVersionInstallPath(selectedVersion, selectedChannel);
+					err := os.RemoveAll(installDir);
+					if err != nil {
+						showErrorDialog(fmt.Sprintf("failed to remove: %s", err), "failed to remove");
+					}
 
-						wDisabled = false;
-					}();
-				},
-			),
+					wDisabled = false;
+				}();
+			}),
 		),
 	};
 }
@@ -344,65 +348,54 @@ func labeledTextInput(label string, value *string, disabled bool) giu.Widget {
 		panic("failed to initalize browse button");
 	}
 
-	flags := giu.InputTextFlagsNone;
-
-	if wDisabled || disabled {
-		flags = giu.InputTextFlagsReadOnly;
-	}
-
-	return giu.Layout{
+	return giu.Style().SetDisabled(wDisabled || disabled).To(
 		giu.Label(label+": "),
-		giu.InputText(value).Flags(flags).Hint(label),
-	}
-}
-
-
-func drawDivider(label string) giu.Widget {
-	return giu.Row(
-		giu.Label(label),
-		       giu.Separator(),
+		giu.Row(
+			giu.InputText(value).Hint(label).Label("##"+label).Size(getWindowWidth()),
+		),
 	);
-}
 
+}
 
 func browseButton(label string, value *string) giu.Widget {
 	if value == nil {
 		panic("failed to initalize browse button");
 	}
 
+	button := giu.Button("Browse").OnClick(func() {
+		dir, err := dialog.Directory().Title("Select "+label).Browse();
+		if err != nil {
+			if err != dialog.ErrCancelled {
+				showErrorDialog(fmt.Sprintf("Failed: %s", err), "Error reading directory");
+			}
+		}
+		*value = dir;
+	})
+
+	// surely there has got to be a better way to do this ..?
+	// it literally tells me not to use this function lol
+	bSize := getButtonSize("Browse");
+	padX, _ := giu.GetWindowPadding();
+
 	return giu.Layout{
 		giu.Label(label + ": "),
 		giu.Row(
-			giu.InputText(value).Hint(label).Label(label + ":  "),
-			giu.Button("Browse").OnClick(func() {
-				dir, err := dialog.Directory().Title("Select "+label).Browse();
-				if err != nil {
-					if err != dialog.ErrCancelled {
-						showErrorDialog(fmt.Sprintf("Failed: %s", err), "Error reading directory");
-					}
-				}
-
-				*value = dir;
-			}),
+			giu.InputText(value).Hint(label).Size(getWindowWidth() - (bSize + padX)),
+			button,
 		),
-	}
+	};
+
 }
 
 
 
 func modeSelector () giu.Widget {
+	modes := []string {"Offline Mode", "Fake Online Mode", "Authenticated"}
+
+
 	return giu.Layout{
 		giu.Label("Launch Mode: "),
-		giu.Combo("#launchMode", wCommune.Mode, []string {"Offline Mode", "Fake Online Mode", "Authenticated"}, &wSelectedMode).OnChange(func() {
-			switch(wSelectedMode) {
-				case 0:
-					wCommune.Mode = "offline";
-				case 1:
-					wCommune.Mode = "fakeonline";
-				case 2:
-					wCommune.Mode = "authenticated";
-			}
-		}),
+		giu.Combo("##launchMode", modes[wCommune.Mode], modes, &wCommune.Mode).Size(getWindowWidth()),
 	};
 }
 
@@ -410,7 +403,7 @@ func modeSelector () giu.Widget {
 
 func drawAuthenticatedSettings() giu.Widget {
 
-	if wCommune.Mode != "authenticated" {
+	if wCommune.Mode != E_MODE_AUTHENTICATED {
 		return giu.Custom(func() {});
 	}
 
@@ -423,123 +416,117 @@ func drawAuthenticatedSettings() giu.Widget {
 			profileList = append(profileList, profile.Username);
 		}
 	}
-	//profilesDisabled := wDisabled || wCommune.Profiles == nil;
 
-	return giu.Layout{
-		drawDivider("Authentication"),
+	padX, _ := giu.GetWindowPadding();
+
+	return giu.Style().SetDisabled(wDisabled).To(
+		drawSeperator("Authentication"),
 		giu.Row(
-			giu.Button("Login (OAuth 2.0").Disabled(loginDisabled).OnClick(func() {
+			giu.Button("Login (OAuth 2.0)").Disabled(loginDisabled).OnClick(func() {
 				go doAuthentication();
-			}),
-			giu.Button("Logout").Disabled(logoutDisabled).OnClick(func() {
-				wCommune.AuthTokens = nil;
-				wCommune.Profiles = nil;
-				writeSettings();
-			}),
-			giu.Label("Select profile"),
-			giu.Combo("##selectProfile", profileList[wCommune.SelectedProfile], profileList, &wCommune.SelectedProfile),
+			}).Size((getWindowWidth() / 2) - padX, 0),
+						giu.Button("Logout").Disabled(logoutDisabled).OnClick(func() {
+							wCommune.AuthTokens = nil;
+							wCommune.Profiles = nil;
+							writeSettings();
+						}).Size((getWindowWidth() / 2) - padX, 0),
 		),
-	};
+		giu.Label("Select profile"),
+		giu.Combo("##selectProfile", profileList[wCommune.SelectedProfile], profileList, &wCommune.SelectedProfile).Size(getWindowWidth()),
+	);
 
 }
 
-
+func drawSeperator(label string) giu.Widget {
+	return giu.Custom(func() {imgui.SeparatorText(label)});
+}
 func updateProgress(done int64, total int64) {
-	lastProgress := wProgress;
-	newProgress := int((float64(done) / float64(total)) * 100.0);
-
-	if newProgress != lastProgress {
-		wProgress = newProgress;
-	}
+	wProgress = float32(float64(done) / float64(total));
 }
 
 func createDownloadProgress () giu.Widget {
-	return giu.ProgressBar(float32(wProgress));
+	progress := (strconv.Itoa(int(wProgress * 100.0)) + "%");
+
+	w, _ := giu.CalcTextSize(progress);
+	padX, _ := giu.GetWindowPadding();
+
+	return giu.Row(
+		giu.ProgressBar(float32(wProgress)).Size(getWindowWidth() - (w + padX), 0),
+		giu.Label(progress),
+	)
 }
 
 func drawStartGame() giu.Widget{
 	return &giu.Layout {
-			labeledTextInput("Username", &wCommune.Username, wCommune.Mode == "authenticated"),
-			modeSelector(),
-			drawDivider("Version"),
-			patchLineMenu(),
-			versionMenu(),
+			giu.Style().SetDisabled(wDisabled).To(
+				labeledTextInput("Username", &wCommune.Username, wCommune.Mode == E_MODE_AUTHENTICATED),
+				modeSelector(),
+				patchLineMenu(),
+				versionMenu(),
+			),
 			createDownloadProgress(),
 			giu.Button("Start Game").Disabled(wDisabled).OnClick(func() {
 				go startGame();
-			}),
-			//drawAuthenticatedSettings(),
+			}).Size(getWindowWidth(), 0),
 	}
 }
 
 func drawSettings() giu.Widget{
-	return giu.Layout{
-		drawDivider("Directories"),
+	return giu.Style().SetDisabled(wDisabled).To(
+		drawSeperator("Directories"),
 		browseButton("Game Location", &wCommune.GameFolder),
 		browseButton("JRE Location", &wCommune.JreFolder),
 		browseButton("UserData Location", &wCommune.UserDataFolder),
-		drawDivider("Advanced"),
-		labeledTextInput("★UUID Override", &wCommune.UUID, wCommune.Mode == "authenticated"),
-	};
+		drawAuthenticatedSettings(),
+		drawSeperator("★Debug Settings"),
+		labeledTextInput("★Override UUID", &wCommune.UUID, wCommune.Mode == E_MODE_AUTHENTICATED),
+	);
+}
 
-	/*
-	return &goey.VBox{
-		AlignMain: goey.MainStart,
-		Children: []base.Widget {
-			drawDivider("Directories"),
-			browseButton("Game Location", &wCommune.GameFolder),
-			browseButton("JRE Location", &wCommune.JreFolder),
-			browseButton("Game UserData Location", &wCommune.UserDataFolder),
-			drawDivider("Advanced"),
-			labeledTextInput("★UUID Override", &wCommune.UUID, wCommune.Mode == "authenticated"),
-		},
-	};*/
+
+
+
+func getButtonSize(label string) float32 {
+	padX, _:= giu.GetFramePadding();
+	wPadX, _:= giu.GetWindowPadding();
+	w, _ := giu.CalcTextSize(label)
+
+	return (wPadX + padX + w);
 }
 
 
 func drawWidgets() {
 
-	giu.SingleWindow().Layout(
+	w, h := wMainWin.GetSize();
+	imgui.SetWindowSizeVec2(imgui.Vec2{X: float32(w), Y: float32(h)});
+
+	wImGuiWindow := giu.SingleWindow();
+
+	wImGuiWindow.Layout(
 		giu.TabBar().TabItems(
 			giu.TabItem("Game").Layout(
 				drawStartGame(),
 			),
-		),
-		giu.TabBar().TabItems(
 			giu.TabItem("Settings").Layout(
 				drawSettings(),
 			),
 		),
-
 	)
-	/*
-	return &goey.Tabs {
-		Value: wSelectedTab,
-		OnChange: func( v int ) {wSelectedTab = v;},
-		Children: []goey.TabItem {
-			{
-				Caption: "Game",
-				Child: drawStartGame(),
-			},
-			{
-				Caption: "Settings",
-				Child: drawSettings(),
-			},
-		},
-	};*/
-
 }
 
 func createWindow() error {
 
-	win := giu.NewMasterWindow("HytaleSP", 400, 200, giu.MasterWindowFlagsNotResizable)
-	if win != nil {
+	wMainWin = giu.NewMasterWindow("HytaleSP", 800, 400, 0);
+	if wMainWin == nil {
 		return fmt.Errorf("result from NewMasterWindow was nil");
 	}
 
-	win.SetCloseCallback(func() bool {
+	io := imgui.CurrentIO();
+	io.SetConfigFlags(io.ConfigFlags() & ^imgui.ConfigFlagsViewportsEnable);
+
+	wMainWin.SetCloseCallback(func() bool {
 		writeSettings();
-		return false;
+		return true;
 	});
 
 
@@ -550,12 +537,11 @@ func createWindow() error {
 	defer f.Close()
 
 	image, _, err := image.Decode(f)
-	win.SetIcon(image);
 
-	// create the ui
-	win.Run(drawWidgets);
 
-	wMainWin = win;
+	wMainWin.SetIcon(image);
+	wMainWin.Run(drawWidgets);
+
 
 	return nil
 }
@@ -566,8 +552,6 @@ func showErrorDialog(msg string, title string) {
 		dlg.Title(title);
 		dlg.Error();
 }
-
-
 
 
 func main() {

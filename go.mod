@@ -3,6 +3,7 @@ module HytaleSP
 go 1.25.3
 
 require (
+	github.com/AllenDang/cimgui-go v1.3.2-0.20250409185506-6b2ff1aa26b5
 	github.com/AllenDang/giu v0.14.1
 	github.com/c4milo/unpackit v1.0.0
 	github.com/google/uuid v1.6.0
@@ -13,7 +14,6 @@ require (
 )
 
 require (
-	github.com/AllenDang/cimgui-go v1.3.2-0.20250409185506-6b2ff1aa26b5 // indirect
 	github.com/AllenDang/go-findfont v0.0.0-20200702051237-9f180485aeb8 // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20180517000239-4f5cfb03fabf // indirect
 	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
