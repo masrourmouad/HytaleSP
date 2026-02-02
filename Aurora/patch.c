@@ -3,6 +3,7 @@
 
 #include "shared.h"
 #include "cs_string.h"
+#include <stdlib.h>
 
 static int num_swaps = 0;
 
@@ -67,6 +68,37 @@ void allowOfflineInOnline(uint8_t* mem) {
 
 }
 
+#ifdef __linux__ 
+int execvpe(const char *filename, char *const argv[], char *const envp[]);
+
+int execve(const char *filename, char *const argv[], char *const envp[]) {
+    
+    if ((envp != NULL && argv != NULL) && 
+        (strstr(filename, "java") != NULL) || (argv[0] != NULL && strstr(argv[0], "java") == NULL))
+    {
+        for(int i = 0; argv[i] != NULL; i++) {
+            // TODO: recreate the entire argv structure without --session-token or --identity-token ..
+            if(strstr(argv[i], "--session-token=") != NULL) {
+                strcpy(argv[i], "--singleplayer");
+            }
+            if(strstr(argv[i], "--identity-token=") != NULL) {
+                strcpy(argv[i], "--singleplayer");
+            }
+            if(strstr(argv[i], "--auth-mode=authenticated") != NULL) {
+                strcpy(argv[i], "--auth-mode=insecure");
+            }
+        }
+
+        for(int i = 0; envp[i] != NULL; i++){
+            if(strstr(envp[i],  "LD_PRELOAD") != NULL) {
+                strcpy(envp[i], ""); // no ld_preload on java plz            
+            }
+        }
+ 
+    }
+    return execvpe(filename, argv, envp);
+}
+#endif
 
 void swap(uint8_t* mem, csString* old, csString* new) {
     if (memcmp(mem, old, get_size_ptr(old)) == 0) {
@@ -84,15 +116,14 @@ void changeServers() {
         {.old = make_csstr(L"https://telemetry."),    .new = make_csstr(L"http://127.0.0")},
         {.old = make_csstr(L"https://tools."),        .new = make_csstr(L"http://127.0.0")},
         {.old = make_csstr(L"hytale.com"),            .new = make_csstr(L".1:59313")},
-        {.old = make_csstr(L"authenticated"),         .new = make_csstr(L"insecure")},
-
+        //{.old = make_csstr(L"authenticated"),         .new = make_csstr(L"insecure")},
         // pre release 10 onwards actually verifies the token you provide here if one is provided
         // but it also validates that you have set valid arguments and will fail if its invalid
         // so im setting this to --singleplayer, it is always set on singleplayer worlds
         // and takes no arguments (so the token will just be discarded ..) 
         // .. enabling it again will therefore do absolutely nothing ..
-        {.old = make_csstr(L"--session-token=\""),    .new = make_csstr(L"--singleplayer=\"")},
-        {.old = make_csstr(L"--identity-token=\""),   .new = make_csstr(L"--singleplayer=\"")},
+        //{.old = make_csstr(L"--session-token=\""),    .new = make_csstr(L"--singleplayer=\"")},
+        //{.old = make_csstr(L"--identity-token=\""),   .new = make_csstr(L"--singleplayer=\"")},
     };
 
 
@@ -114,7 +145,6 @@ void changeServers() {
     for (size_t i = 0; i < modinf.sz; i++) {
         // allow online mode in offline mode.
         allowOfflineInOnline(&memory[i]);
-
         for (int sw = 0; sw < totalSwaps; sw++) {
             swap(&memory[i], &swaps[sw].old, &swaps[sw].new);
         }
@@ -124,3 +154,4 @@ void changeServers() {
 
 
 }
+

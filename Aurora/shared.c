@@ -130,7 +130,6 @@ void changeServers();
 #ifdef __linux__
 __attribute__((constructor)) int run() {
 	// cleanup after ourselves.
-	unsetenv("LD_PRELOAD");
 	changeServers();
 	return 0;
 }
