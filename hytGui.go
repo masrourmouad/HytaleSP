@@ -384,7 +384,7 @@ func labeledTextInput(label string, value *string, disabled bool) giu.Widget {
 
 }
 
-func browseButton(label string, value *string) giu.Widget {
+func browseButton(label string, value *string, callback func()) giu.Widget {
 	if value == nil {
 		panic("failed to initalize browse button");
 	}
@@ -397,6 +397,7 @@ func browseButton(label string, value *string) giu.Widget {
 			}
 		}
 		*value = dir;
+		if callback != nil { callback(); }
 	})
 
 	// surely there has got to be a better way to do this ..?
@@ -407,7 +408,7 @@ func browseButton(label string, value *string) giu.Widget {
 	return giu.Layout{
 		giu.Label(label + ": "),
 		giu.Row(
-			giu.InputText(value).Hint(label).Size(getWindowWidth() - (bSize + padX)),
+			giu.InputText(value).Hint(label).Size(getWindowWidth() - (bSize + padX)).OnChange(func() { if callback != nil { callback(); } }),
 			button,
 		),
 	};
@@ -488,7 +489,6 @@ func createDownloadProgress () giu.Widget {
 	padX, _ := giu.GetWindowPadding();
 
 	return giu.Layout{
-		drawSeperator("Game"),
 		giu.Row(
 			giu.ProgressBar(float32(wProgress)).Size(getWindowWidth() - (w + padX), 0),
 			giu.Label(progress),
@@ -512,7 +512,8 @@ func drawStartGame() giu.Widget{
 			giu.Style().SetDisabled(wDisabled).To(
 				drawUserSelection(),
 				modeSelector(),
-				// maybe should seperate these two (?) possibly could move mode selector to another folder too
+				// maybe should seperate these two  somehow (???)
+				drawSeperator("Version"),
 				patchLineMenu(),
 				versionMenu(),
 			),
@@ -527,9 +528,9 @@ func drawSettings() giu.Widget{
 
 	return giu.Style().SetDisabled(wDisabled).To(
 		drawSeperator("Directories"),
-		giu.Tooltip("The location that the game files are stored\n(they will be downloaded here, if it's not found)").To(browseButton("Game Location", &wCommune.GameFolder)),
-		giu.Tooltip("The location of the Java Runtime Environment that the game's server uses\n(it will be downloaded here, if it's not found)").To(browseButton("JRE Location", &wCommune.JreFolder)),
-		giu.Tooltip("The location that the games savedata will be stored,\n(worlds, mods, server list, log files, etc)").To(browseButton("User Data Location", &wCommune.UserDataFolder)),
+		giu.Tooltip("The location that the game files are stored\n(they will be downloaded here, if it's not found)").To(browseButton("Game Location", &wCommune.GameFolder, cacheVersionList)),
+		giu.Tooltip("The location of the Java Runtime Environment that the game's server uses\n(it will be downloaded here, if it's not found)").To(browseButton("JRE Location", &wCommune.JreFolder, nil)),
+		giu.Tooltip("The location that the games savedata will be stored,\n(worlds, mods, server list, log files, etc)").To(browseButton("User Data Location", &wCommune.UserDataFolder, nil)),
 		giu.Tooltip("These are settings for advanced usecases that are not likely to be needed by most users.\nThe convention of prefixing them with a \"★\" is shamelessly stolen from PlayStation.").To(
 			giu.TreeNode("★Debug Settings").Layout(
 			giu.Tooltip("Allows you to run the game spoofing a specific Universal Unique Identifier (you probably dont need this)").To(labeledTextInput("★Override UUID", &wCommune.UUID, wCommune.Mode == E_MODE_AUTHENTICATED)),
